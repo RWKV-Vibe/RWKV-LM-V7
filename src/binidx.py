@@ -2,10 +2,6 @@ import os
 import struct
 from functools import lru_cache
 from itertools import accumulate
-<<<<<<< main
-# from lib2to3.pgen2 import token
-=======
->>>>>>> main
 
 import numpy as np
 import torch
