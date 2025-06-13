@@ -28,7 +28,7 @@ except:
 def __nop(ob):
     return ob
 
-
+ROCm_flag=torch.version.hip is not None
 MyModule = nn.Module
 MyFunction = __nop
 if os.environ["RWKV_JIT_ON"] == "1":
@@ -46,10 +46,16 @@ HEAD_SIZE = int(os.environ["RWKV_HEAD_SIZE"])
 if 'x070' in os.environ["RWKV_MY_TESTING"]:
     CHUNK_LEN = 16
 
-    flags = ['-res-usage', f'-D_C_={HEAD_SIZE}', f"-D_CHUNK_LEN_={CHUNK_LEN}",
-             "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization"]
-    load(name="wind_backstepping", sources=[
-         f'cuda/wkv7_cuda.cu', 'cuda/wkv7_op.cpp'], is_python_module=False, verbose=True, extra_cuda_cflags=flags)
+    if ROCm_flag == True:
+        flags = [f'-D_C_={HEAD_SIZE}', f"-D_CHUNK_LEN_={CHUNK_LEN}",
+                 '-xhip', '-fopenmp', '-ffast-math', '-O3','-munsafe-fp-atomics']
+        load(name="wind_backstepping_hip", sources=[
+             f'cuda/wkv7_hip.hip', 'cuda/wkv7_op.hip'], is_python_module=False, verbose=True, extra_cuda_cflags=flags)
+    else:    
+        flags = ['-res-usage', f'-D_C_={HEAD_SIZE}', f"-D_CHUNK_LEN_={CHUNK_LEN}",
+                 "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization"]
+        load(name="wind_backstepping", sources=[
+             f'cuda/wkv7_cuda.cu', 'cuda/wkv7_op.cpp'], is_python_module=False, verbose=True, extra_cuda_cflags=flags)
 
     class WindBackstepping(torch.autograd.Function):
         @staticmethod
