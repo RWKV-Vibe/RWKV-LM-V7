@@ -46,7 +46,7 @@ HEAD_SIZE = int(os.environ["RWKV_HEAD_SIZE"])
 if "x070" in os.environ["RWKV_MY_TESTING"]:
     CHUNK_LEN = 16
 
-    if ROCm_flag == True:
+    if ROCm_flag is True:
         flags = [
             f"-D_C_={HEAD_SIZE}",
             f"-D_CHUNK_LEN_={CHUNK_LEN}",
@@ -58,7 +58,7 @@ if "x070" in os.environ["RWKV_MY_TESTING"]:
         ]
         load(
             name="wind_backstepping_hip",
-            sources=[f"cuda/wkv7_hip.hip", "cuda/wkv7_op.hip"],
+            sources=["cuda/wkv7_hip.hip", "cuda/wkv7_op.hip"],
             is_python_module=False,
             verbose=True,
             extra_cuda_cflags=flags,
@@ -75,7 +75,7 @@ if "x070" in os.environ["RWKV_MY_TESTING"]:
         ]
         load(
             name="wind_backstepping",
-            sources=[f"cuda/wkv7_cuda.cu", "cuda/wkv7_op.cpp"],
+            sources=["cuda/wkv7_cuda.cu", "cuda/wkv7_op.cpp"],
             is_python_module=False,
             verbose=True,
             extra_cuda_cflags=flags,
