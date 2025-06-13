@@ -1,9 +1,11 @@
 import os
-import shutil
 import struct
 from functools import lru_cache
 from itertools import accumulate
+<<<<<<< main
 # from lib2to3.pgen2 import token
+=======
+>>>>>>> main
 
 import numpy as np
 import torch
@@ -189,8 +191,8 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
     def __getstate__(self):
         return self._path
 
-    def __setstate__(self, state):
-        self._do_init(state)
+    def __setstate__(self, state, skip_warmup=False):
+        self._do_init(state, skip_warmup)
 
     def _do_init(self, path, skip_warmup):
         self._path = path
