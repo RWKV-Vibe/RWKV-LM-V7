@@ -46,9 +46,10 @@ MY_EXIT_TOKENS="1498226207"
 MAGIC_PRIME="2926181"
 DATA_FILE="data/minipile"
 DATA_TYPE="binidx"
-WANDB="Test"
+WANDB=""
 #
 python train.py \
+ --wandb "" \
  --accelerator gpu \
  --adam_eps 1e-18 \
  --beta1 0.9 \
@@ -79,6 +80,5 @@ python train.py \
  --strategy deepspeed_stage_2 \
  --train_stage 3 \
  --vocab_size 65536 \
- --wandb $WANDB \
  --warmup_steps 10 \
  --weight_decay 0.001 \
