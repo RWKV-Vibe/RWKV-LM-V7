@@ -46,7 +46,6 @@ MY_EXIT_TOKENS="1498226207"
 MAGIC_PRIME="2926181"
 DATA_FILE="data/minipile"
 DATA_TYPE="binidx"
-WANDB=""
 #
 python train.py \
  --wandb "" \
