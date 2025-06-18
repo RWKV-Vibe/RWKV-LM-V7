@@ -240,4 +240,5 @@ def generate_init_weight(model, init_weight_name):
 
     if model.args.train_stage == 1:
         rank_zero_info("Done. Now go for stage 2.")
-        exit(0)
+        import sys
+        sys.exit(0)
