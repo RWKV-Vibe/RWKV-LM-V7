@@ -1,5 +1,6 @@
 #include <torch/extension.h>
-#include <hip/hip_bf16.h>
+
+struct __hip_bfloat16;
 using bf = __hip_bfloat16;
 
 void cuda_forward(int B, int T, int H, bf*w, bf*q, bf*k, bf*v, bf*z, bf*a, bf*y, float*s, float*sa);
