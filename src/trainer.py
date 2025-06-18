@@ -45,11 +45,13 @@ class train_callback(pl.Callback):
                 lr = (lr + args.lr_init * lr_mult) / 2
             if progress >= 1:
                 if (trainer.is_global_zero) or ('deepspeed_stage_3' in args.strategy):
+                    final_path = f"{args.proj_dir}/rwkv-final.pth"
                     my_save(
                         args, trainer,
                         pl_module.state_dict(),
-                        f"{args.proj_dir}/rwkv-final.pth",
+                        final_path,
                     )
+                    print(f"\n✅ End of training. Model saved to: {final_path}\n")
                     exit(0)
         if trainer.global_step < w_step:
             lr = lr * (0.01 + 0.99 * trainer.global_step / w_step)
@@ -124,11 +126,13 @@ class train_callback(pl.Callback):
             if args.magic_prime > 0:
                 if int(real_step) == int(args.magic_prime // args.real_bsz) - 1:
                     to_save_dict = pl_module.state_dict()
+                    final_path = f"{args.proj_dir}/rwkv-final.pth"
                     my_save(
                         args, trainer,
                         to_save_dict,
-                        f"{args.proj_dir}/rwkv-final.pth",
+                        final_path,
                     )
+                    print(f"\n✅ End of training. Model saved to: {final_path}\n")
 
     def on_train_epoch_start(self, trainer, pl_module):
         args = self.args
