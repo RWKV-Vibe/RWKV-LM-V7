@@ -1,17 +1,14 @@
 import datetime
 import math
-import os
-import subprocess
 import time
 
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.utilities import rank_zero_info, rank_zero_only
-from torch.utils.data import DataLoader
 
 
 def my_save(args, trainer, dd, ff):
-    if 'deepspeed_stage_3' in args.strategy:
+    if "deepspeed_stage_3" in args.strategy:
         trainer.save_checkpoint(ff, weights_only=True)
     else:
         torch.save(dd, ff)
@@ -33,26 +30,33 @@ class train_callback(pl.Callback):
         if args.my_exit_tokens != 0:  # cosine decay
             real_tokens = real_step * args.ctx_len * args.real_bsz
             warmup_tokens = w_step * args.ctx_len * args.real_bsz
-            progress = (real_tokens - warmup_tokens) / \
-                (abs(args.my_exit_tokens) - warmup_tokens)
+            progress = (real_tokens - warmup_tokens) / (
+                abs(args.my_exit_tokens) - warmup_tokens
+            )
             progress = max(0, min(1, progress))
             lr_final_factor = args.lr_final / args.lr_init
-            lr_mult = (0.5 + lr_final_factor / 2) + (0.5 -
-                                                     lr_final_factor / 2) * math.cos(math.pi * progress)
+            lr_mult = (0.5 + lr_final_factor / 2) + (
+                0.5 - lr_final_factor / 2
+            ) * math.cos(math.pi * progress)
             if args.my_exit_tokens > 0:
                 lr = args.lr_init * lr_mult
             else:
                 lr = (lr + args.lr_init * lr_mult) / 2
             if progress >= 1:
-                if (trainer.is_global_zero) or ('deepspeed_stage_3' in args.strategy):
+                if (trainer.is_global_zero) or ("deepspeed_stage_3" in args.strategy):
                     final_path = f"{args.proj_dir}/rwkv-final.pth"
                     my_save(
-                        args, trainer,
+                        args,
+                        trainer,
                         pl_module.state_dict(),
                         final_path,
                     )
-                    print(f"\n✅ End of training. Model saved to: {final_path}\n")
-                    exit(0)
+                    rank_zero_info(
+                        f"\n✅ End of training. Model saved to: {final_path}\n"
+                    )
+                    import sys
+
+                    sys.exit(0)
         if trainer.global_step < w_step:
             lr = lr * (0.01 + 0.99 * trainer.global_step / w_step)
 
@@ -72,16 +76,18 @@ class train_callback(pl.Callback):
                 trainer.my_loss_count = 0
                 trainer.my_log = open(args.proj_dir + "/train_log.txt", "a")
                 trainer.my_log.write(
-                    f"NEW RUN {args.my_timestamp}\n{vars(self.args)}\n")
+                    f"NEW RUN {args.my_timestamp}\n{vars(self.args)}\n"
+                )
                 try:
-                    print(f"\n{trainer.strategy.config}\n")
+                    rank_zero_info(f"\n{trainer.strategy.config}\n")
                     trainer.my_log.write(f"{trainer.strategy.config}\n")
-                except:
+                except BaseException:
                     pass
                 trainer.my_log.flush()
                 if len(args.wandb) > 0:
-                    print("Login to wandb...")
+                    rank_zero_info("Login to wandb...")
                     import wandb
+
                     wandb.init(
                         project=args.wandb,
                         name=args.run_name + " " + args.my_timestamp,
@@ -101,10 +107,9 @@ class train_callback(pl.Callback):
             try:
                 t_cost = (t_now - trainer.my_time_ns) / 1e9
                 kt_s = token_per_step / t_cost / 1000
-                self.log("REAL it/s", 1.0 / t_cost,
-                         prog_bar=True, on_step=True)
+                self.log("REAL it/s", 1.0 / t_cost, prog_bar=True, on_step=True)
                 self.log("Kt/s", kt_s, prog_bar=True, on_step=True)
-            except:
+            except BaseException:
                 pass
             trainer.my_time_ns = t_now
             trainer.my_loss = trainer.my_loss_all.float().mean().item()
@@ -112,27 +117,35 @@ class train_callback(pl.Callback):
             trainer.my_loss_count += 1
             trainer.my_epoch_loss = trainer.my_loss_sum / trainer.my_loss_count
             self.log("lr", trainer.my_lr, prog_bar=True, on_step=True)
-            self.log("loss", trainer.my_epoch_loss,
-                     prog_bar=True, on_step=True)
+            self.log("loss", trainer.my_epoch_loss, prog_bar=True, on_step=True)
 
             if len(args.wandb) > 0:
-                lll = {"loss": trainer.my_loss, "lr": trainer.my_lr,
-                       "wd": trainer.my_wd, "Gtokens": real_step * token_per_step / 1e9}
+                lll = {
+                    "loss": trainer.my_loss,
+                    "lr": trainer.my_lr,
+                    "wd": trainer.my_wd,
+                    "Gtokens": real_step * token_per_step / 1e9,
+                }
                 if kt_s > 0:
                     lll["kt/s"] = kt_s
                 trainer.my_wandb.log(lll, step=int(real_step))
 
-        if (trainer.is_global_zero) or ('deepspeed_stage_3' in args.strategy):  # save pth
+        if (trainer.is_global_zero) or (
+            "deepspeed_stage_3" in args.strategy
+        ):  # save pth
             if args.magic_prime > 0:
                 if int(real_step) == int(args.magic_prime // args.real_bsz) - 1:
                     to_save_dict = pl_module.state_dict()
                     final_path = f"{args.proj_dir}/rwkv-final.pth"
                     my_save(
-                        args, trainer,
+                        args,
+                        trainer,
                         to_save_dict,
                         final_path,
                     )
-                    print(f"\n✅ End of training. Model saved to: {final_path}\n")
+                    rank_zero_info(
+                        f"\n✅ End of training. Model saved to: {final_path}\n"
+                    )
 
     def on_train_epoch_start(self, trainer, pl_module):
         args = self.args
@@ -141,32 +154,44 @@ class train_callback(pl.Callback):
         dataset.global_rank = trainer.global_rank
         dataset.real_epoch = int(args.epoch_begin + trainer.current_epoch)
         dataset.world_size = trainer.world_size
-        # print(f'########## world_size {dataset.world_size} global_rank {dataset.global_rank} real_epoch {dataset.real_epoch} ##########')
 
     def on_train_epoch_end(self, trainer, pl_module):
         args = self.args
         to_save_dict = {}
-        if (trainer.is_global_zero) or ('deepspeed_stage_3' in args.strategy):  # save pth
-            if (args.epoch_save > 0 and trainer.current_epoch % args.epoch_save == 0) or (trainer.current_epoch == args.epoch_count - 1):
-                if args.data_type == 'wds_img':
+        if (trainer.is_global_zero) or (
+            "deepspeed_stage_3" in args.strategy
+        ):  # save pth
+            if (
+                args.epoch_save > 0 and trainer.current_epoch % args.epoch_save == 0
+            ) or (trainer.current_epoch == args.epoch_count - 1):
+                if args.data_type == "wds_img":
                     raw_dict = pl_module.state_dict()
                     for k in raw_dict:
-                        if k.startswith('encoder.') or k.startswith('decoder.'):
+                        if k.startswith("encoder.") or k.startswith("decoder."):
                             to_save_dict[k] = raw_dict[k]
                 else:
                     to_save_dict = pl_module.state_dict()
                 try:
                     my_save(
-                        args, trainer,
+                        args,
+                        trainer,
                         to_save_dict,
                         f"{args.proj_dir}/rwkv-{args.epoch_begin + trainer.current_epoch}.pth",
                     )
                 except Exception as e:
-                    print('Error\n\n', e, '\n\n')
+                    rank_zero_info("Error\n\n", e, "\n\n")
 
         if trainer.is_global_zero:  # logging
             trainer.my_log.write(
-                f"{args.epoch_begin + trainer.current_epoch} {trainer.my_epoch_loss:.6f} {math.exp(trainer.my_epoch_loss):.4f} {trainer.my_lr:.8f} {datetime.datetime.now()} {trainer.current_epoch}\n")
+                (
+                    f"{args.epoch_begin + trainer.current_epoch} "
+                    f"{trainer.my_epoch_loss:.6f} "
+                    f"{math.exp(trainer.my_epoch_loss):.4f} "
+                    f"{trainer.my_lr:.8f} "
+                    f"{datetime.datetime.now()} "
+                    f"{trainer.current_epoch}\n"
+                )
+            )
             trainer.my_log.flush()
 
             trainer.my_loss_sum = 0
@@ -179,39 +204,40 @@ def generate_init_weight(model, init_weight_name):
 
     if model.args.train_stage == 1:
         if len(model.args.load_model) > 0:
-            print(f"Combine weights from {model.args.load_model}...")
+            rank_zero_info(f"Combine weights from {model.args.load_model}...")
             load_dict = torch.load(model.args.load_model, map_location="cpu")
             for k in load_dict:
                 try:
                     assert k in mm
-                except:
-                    print('missing', k)
-                    exit(0)
+                except BaseException:
+                    rank_zero_info("missing", k)
+                    import sys
+                    sys.exit(0)
                 src = load_dict[k]
                 try:
                     mm[k] = src.reshape(mm[k].shape)
-                except:
+                except BaseException:
                     tmp = mm[k].squeeze().clone()
-                    print(k, src.shape, '-->', mm[k].shape)
+                    rank_zero_info(k, src.shape, "-->", mm[k].shape)
                     ss = src.shape[0]
                     dd = tmp.shape[0]
                     for i in range(dd):
                         pos = i / dd * ss
                         if pos >= ss - 1:
-                            tmp[i] = src[ss-1]
+                            tmp[i] = src[ss - 1]
                         else:
                             p0 = int(math.floor(pos))
                             ii = pos - p0
-                            tmp[i] = src[p0] * (1-ii) + src[p0+1] * (ii)
+                            tmp[i] = src[p0] * (1 - ii) + src[p0 + 1] * (ii)
                     mm[k] = tmp.reshape(mm[k].shape)
                     sss = src.squeeze().float().cpu().numpy()
-                    print(sss[:10], '...', sss[-10:])
+                    rank_zero_info(sss[:10], "...", sss[-10:])
                     mmm = mm[k].squeeze().float().cpu().numpy()
-                    print(mmm[:10], '...', mmm[-10:])
+                    rank_zero_info(mmm[:10], "...", mmm[-10:])
 
-    print(f"Save to {init_weight_name}...")
+    rank_zero_info(f"Save to {init_weight_name}...")
     torch.save(mm, init_weight_name)
 
     if model.args.train_stage == 1:
-        print("Done. Now go for stage 2.")
+        rank_zero_info("Done. Now go for stage 2.")
         exit(0)
