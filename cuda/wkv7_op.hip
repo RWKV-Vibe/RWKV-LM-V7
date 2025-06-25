@@ -1,5 +1,6 @@
 #include <torch/extension.h>
-#include <hip/hip_bf16.h>
+
+struct __hip_bfloat16;
 using bf = __hip_bfloat16;
 
 void cuda_forward(int B, int T, int H, bf*w, bf*q, bf*k, bf*v, bf*z, bf*a, bf*y, float*s, float*sa);
@@ -18,12 +19,12 @@ void backward(torch::Tensor &w, torch::Tensor &q, torch::Tensor &k, torch::Tenso
             (float*)s.data_ptr(), (float*)sa.data_ptr(), (bf*)dw.data_ptr(), (bf*)dq.data_ptr(), (bf*)dk.data_ptr(), (bf*)dv.data_ptr(), (bf*)dz.data_ptr(), (bf*)da.data_ptr());
 }
 
-TORCH_LIBRARY(wind_backstepping, m) {
+TORCH_LIBRARY(wind_backstepping_hip, m) {
     m.def("forward(Tensor w, Tensor q, Tensor k, Tensor v, Tensor z, Tensor a, Tensor(a!) y, Tensor(b!) s, Tensor(c!) sa) -> ()");
     m.def("backward(Tensor w, Tensor q, Tensor k, Tensor v, Tensor z, Tensor a, Tensor dy, Tensor s, Tensor sa, Tensor(a!) dw, Tensor(b!) dq, Tensor(c!) dk, Tensor(d!) dv, Tensor(e!) dz, Tensor(f!) da) -> ()");
 }
 
-TORCH_LIBRARY_IMPL(wind_backstepping, CUDA, m) {
+TORCH_LIBRARY_IMPL(wind_backstepping_hip, CUDA, m) {
     m.impl("forward", &forward);
     m.impl("backward", &backward);
 }

@@ -2,7 +2,7 @@
 <div align="center">
 
 # RWKV-LM-V7
-[![English](https://img.shields.io/badge/README-English-blue.svg)](./README.md) 
+[![English](https://img.shields.io/badge/README-English-blue.svg)](./README.md)
 [![中文](https://img.shields.io/badge/README-中文版本-red.svg)](./README_CN.md)
 
 </div>
@@ -142,4 +142,60 @@ RWKV-7 weight example for 1.5B (L24-D2048, vocab 65536):
 9 3.336911 28.1321 0.00057511 2025-04-24 03:04:52.006063 9
 10 3.313411 27.4787 0.00056999 2025-04-24 03:09:27.563336 10
 11 3.295895 27.0016 0.00056441 2025-04-24 03:14:01.786079 11
+```
+
+## 处理训练数据
+
+### 将 jsonl 转换为 binidx 格式
+
+使用 `data/make_data.py` 脚本将你的训练数据从 `.jsonl` 格式转换为 `binidx` 格式。
+
+```
+python make_data.py [输入文件] [重复轮数] [上下文长度]
+# 示例：
+cd data/
+python make_data.py demo.jsonl 3 4096
+```
+
+`python make_data.py demo.jsonl 3 4096` 命令将会：
+
+- 对 demo.jsonl 进行打乱并复制 3 轮
+- 加载 jsonl 并进行 tokenize
+- 保存为 demo.bin 和 demo.idx
+- 计算 ctxlen=4096 时的 `magic_prime`
+
+假设你的源 jsonl 如下：
+
+- {"text":"aa"}
+- {"text":"bb"}
+- {"text":"cc"}
+- {"text":"dd"}
+
+最终的 binidx 会像这样（这里 "/" 表示 end_of_doc，实际是 token [0]）：`bb/aa/dd/cc/dd/aa/bb/cc/dd/bb/cc/aa/`
+
+> [!WARNING]
+> make_data.py 处理大体积 jsonl 时会非常慢，如需处理大文件请参考 [json2binidx_tool](https://github.com/Abel2076/json2binidx_tool)。
+
+### 为指定 binidx 数据集计算 magic_prime
+
+`data/compute_magic_prime.py` 脚本可为指定的 binidx 数据集和上下文长度（ctx_len）计算正确的 `--my_exit_tokens` 和 `--magic_prime` 值。
+
+1. 在 `data/compute_magic_prime.py` 中修改你的训练数据集和上下文长度（`DATA_NAME` 和 `CTX_LEN`）
+2. 运行脚本以获得正确的 `--my_exit_tokens` 和 `--magic_prime` 值
+
+```
+cd data/
+python compute_magic_prime.py
+```
+
+最终输出类似于：
+
+```
+### Loading /home/rwkv/RWKV-LM-V7/data/demo
+
+### /home/rwkv/RWKV-LM-V7/data/demo.bin/idx has 200499 tokens, 546 items. Dtype <class 'numpy.uint16'>
+
+### magic_prime = 47 (for ctxlen 4096)
+
+--my_exit_tokens 200499 --magic_prime 47 --ctx_len 4096
 ```

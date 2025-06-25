@@ -1,7 +1,7 @@
 <div align="center">
 
 # RWKV-LM-V7
-[![English](https://img.shields.io/badge/README-English-blue.svg)](./README.md) 
+[![English](https://img.shields.io/badge/README-English-blue.svg)](./README.md)
 [![中文](https://img.shields.io/badge/README-中文版本-red.svg)](./README_CN.md)
 
 </div>
@@ -141,4 +141,60 @@ your `out/....../train_log.txt` should have losses similar to:
 9 3.336911 28.1321 0.00057511 2025-04-24 03:04:52.006063 9
 10 3.313411 27.4787 0.00056999 2025-04-24 03:09:27.563336 10
 11 3.295895 27.0016 0.00056441 2025-04-24 03:14:01.786079 11
+```
+
+## Processing training data
+
+### Convert jsonl to binidx format
+
+Use `data/make_data.py` script to convert your training data from `.jsonl` format to `binidx` format.
+
+```
+python data/make_data.py [input_file] [n_epoch] [ctx_len]
+# example:
+cd data/
+python make_data.py demo.jsonl 3 4096
+```
+
+This command will:
+
+- shuffle & duplicate demo.jsonl (for 3 epochs)
+- load jsonl and tokenize
+- save as demo.bin & demo.idx
+- compute "magic_prime" for ctxlen 4096
+
+Assume your source jsonl is:
+
+- {"text":"aa"}
+- {"text":"bb"}
+- {"text":"cc"}
+- {"text":"dd"}
+
+The final binidx will be like (here "/" means end_of_doc, which is actually token [0]): `bb/aa/dd/cc/dd/aa/bb/cc/dd/bb/cc/aa/`
+
+> [!WARNING]
+> make_data.py will be very slow for large jsonl,check [json2binidx_tool](https://github.com/Abel2076/json2binidx_tool) if you need to process large jsonl.
+
+### Compute magic_prime for specified binidx dataset
+
+The `data/compute_magic_prime.py` script computes the correct values of `--my_exit_tokens` and `--magic_prime` for a specified binidx dataset and context length (ctx_len).
+
+- change the `DATA_NAME` and `CTX_LEN` in the `data/compute_magic_prime.py` for your training dataset and context length
+- run the script to get the correct values of `--my_exit_tokens` and `--magic_prime`
+
+```
+cd data/
+python compute_magic_prime.py
+```
+
+output will be like:
+
+```
+### Loading /home/rwkv/RWKV-LM-V7/data/demo
+
+### /home/rwkv/RWKV-LM-V7/data/demo.bin/idx has 200499 tokens, 546 items. Dtype <class 'numpy.uint16'>
+
+### magic_prime = 47 (for ctxlen 4096)
+
+--my_exit_tokens 200499 --magic_prime 47 --ctx_len 4096
 ```

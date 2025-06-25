@@ -1,3 +1,8 @@
 *.pyc
 data/*
+!data/demo.jsonl
+!data/compute_magic_prime.py
+!data/make_data.py
+!data/tokenizer/
+!data/tokenizer/**
 out/*
