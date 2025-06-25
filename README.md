@@ -1,7 +1,7 @@
 <div align="center">
 
 # RWKV-LM-V7
-[![English](https://img.shields.io/badge/README-English-blue.svg)](./README.md) 
+[![English](https://img.shields.io/badge/README-English-blue.svg)](./README.md)
 [![中文](https://img.shields.io/badge/README-中文版本-red.svg)](./README_CN.md)
 
 </div>
@@ -150,7 +150,7 @@ your `out/....../train_log.txt` should have losses similar to:
 Use `data/make_data.py` script to convert your training data from `.jsonl` format to `binidx` format.
 
 ```
-python data/make_data.py [input_file] [n_epoch] [ctx_len] 
+python data/make_data.py [input_file] [n_epoch] [ctx_len]
 # example:
 cd data/
 python make_data.py demo.jsonl 3 4096
@@ -158,7 +158,7 @@ python make_data.py demo.jsonl 3 4096
 
 This command will:
 
-- shuffle & duplicate demo.jsonl (for 3 epochs) 
+- shuffle & duplicate demo.jsonl (for 3 epochs)
 - load jsonl and tokenize
 - save as demo.bin & demo.idx
 - compute "magic_prime" for ctxlen 4096

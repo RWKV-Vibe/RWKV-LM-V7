@@ -1,5 +1,14 @@
-import json, math, random, sys, time, shutil, os, string, re, fileinput
+import fileinput
+import json
+import os
+import random
+import sys
+
 import numpy as np
+from tokenizer.rwkv_tokenizer import TRIE_TOKENIZER
+
+from src.binidx import MMapIndexedDataset
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 """
@@ -8,7 +17,8 @@ How to use:
 python make_data.py demo.jsonl 3 4096
 
 This will:
-==> shuffle & duplicate demo.jsonl (for 3 epochs, good for finetuning) note: this will be very slow for large jsonl and we need more efficient code.
+==> shuffle & duplicate demo.jsonl (for 3 epochs, good for finetuning)
+note: this will be very slow for large jsonl and we need more efficient code.
 ==> load jsonl and tokenize
 ==> save as demo.bin & demo.idx
 ==> compute "magic_prime" for ctxlen 4096
@@ -31,30 +41,42 @@ where the data is repeated 3 times (each time with different shuffle)
 # MMapIndexedDatasetBuilder
 ########################################################################################################
 
-from tokenizer.rwkv_tokenizer import TRIE_TOKENIZER
+
 tokenizer = TRIE_TOKENIZER("tokenizer/rwkv_vocab_v20230424.txt")
-from src.binidx import MMapIndexedDataset
+
+
 def index_file_path(prefix_path):
     return prefix_path + ".idx"
+
+
 def data_file_path(prefix_path):
     return prefix_path + ".bin"
+
+
 class MMapIndexedDatasetBuilder(object):
     def __init__(self, out_file, dtype=np.uint16):
         self._data_file = open(out_file, "wb")
         self._dtype = dtype
         self._sizes = []
         self._doc_idx = [0]
+
     def add_item(self, np_array):
         assert np_array.dtype == self._dtype
         self._data_file.write(np_array.tobytes(order="C"))
         self._sizes.append(np_array.size)
+
     def end_document(self):
         self._doc_idx.append(len(self._sizes))
+
     def finalize(self, index_file):
         self._data_file.close()
         with MMapIndexedDataset.Index.writer(index_file, self._dtype) as index:
             index.write(self._sizes, self._doc_idx)
+
+
 cnt = 0
+
+
 def add_raw(raw):
     global builder, cnt
     out = tokenizer.encode(raw)
@@ -67,6 +89,8 @@ def add_raw(raw):
     if cnt % 500 == 0:
         print(cnt, end=" ", flush=True)
     cnt += 1
+
+
 def is_prime(n):
     if n <= 1:
         return False
@@ -82,6 +106,7 @@ def is_prime(n):
     return True
 
 ########################################################################################################
+
 
 N_EPOCH = int(sys.argv[2].strip())
 IN_FILE = sys.argv[1].strip()
@@ -132,19 +157,19 @@ for idx in TODO:
     if len(dix) > PREVIEW_LIMIT:
         try:
             print(tokenizer.decode(dix[:PREVIEW_LIMIT]))
-        except:
+        except BaseException:
             try:
                 print(tokenizer.decode(dix[: PREVIEW_LIMIT + 1]))
-            except:
+            except BaseException:
                 print(tokenizer.decode(dix[: PREVIEW_LIMIT + 2]))
         print("· " * 30)
         try:  # avoid utf-8 bug
             print(tokenizer.decode(dix[-PREVIEW_LIMIT:]))
-        except:
+        except BaseException:
             try:
-                print(tokenizer.decode(dix[-PREVIEW_LIMIT - 1 :]))
-            except:
-                print(tokenizer.decode(dix[-PREVIEW_LIMIT - 2 :]))
+                print(tokenizer.decode(dix[-PREVIEW_LIMIT - 1:]))
+            except BaseException:
+                print(tokenizer.decode(dix[-PREVIEW_LIMIT - 2:]))
     else:
         print(tokenizer.decode(dix))
 
@@ -156,5 +181,6 @@ if data_size >= CTX_LEN * 3:
         if i % 3 == 2:
             if is_prime(i):
                 print(f"\n### magic_prime = {i} (for ctxlen {CTX_LEN})")
-                print(f'\n--my_exit_tokens {data_size} --magic_prime {i} --ctx_len {CTX_LEN}\n')
+                print(
+                    f'\n--my_exit_tokens {data_size} --magic_prime {i} --ctx_len {CTX_LEN}\n')
                 exit(0)

@@ -2,7 +2,7 @@
 <div align="center">
 
 # RWKV-LM-V7
-[![English](https://img.shields.io/badge/README-English-blue.svg)](./README.md) 
+[![English](https://img.shields.io/badge/README-English-blue.svg)](./README.md)
 [![中文](https://img.shields.io/badge/README-中文版本-red.svg)](./README_CN.md)
 
 </div>
