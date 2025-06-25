@@ -145,7 +145,7 @@ your `out/....../train_log.txt` should have losses similar to:
 
 ## Processing training data
 
-### Convert jsonl to binidx
+### Convert jsonl to binidx format
 
 Use `data/make_data.py` script to convert your training data from `.jsonl` format to `binidx` format.
 
@@ -156,7 +156,7 @@ cd data/
 python make_data.py demo.jsonl 3 4096
 ```
 
-This will:
+This command will:
 
 - shuffle & duplicate demo.jsonl (for 3 epochs) 
 - load jsonl and tokenize
@@ -175,7 +175,7 @@ The final binidx will be like (here "/" means end_of_doc, which is actually toke
 > [!WARNING]
 > make_data.py will be very slow for large jsonl,check [json2binidx_tool](https://github.com/Abel2076/json2binidx_tool) if you need to process large jsonl.
 
-### Compute magic_prime
+### Compute magic_prime for specified binidx dataset
 
 The `data/compute_magic_prime.py` script computes the correct values of `--my_exit_tokens` and `--magic_prime` for a specified binidx dataset and context length (ctx_len).
 
@@ -186,7 +186,9 @@ The `data/compute_magic_prime.py` script computes the correct values of `--my_ex
 cd data/
 python compute_magic_prime.py
 ```
+
 output will be like:
+
 ```
 ### Loading /home/rwkv/RWKV-LM-V7/data/demo
 
@@ -196,11 +198,3 @@ output will be like:
 
 --my_exit_tokens 200499 --magic_prime 47 --ctx_len 4096
 ```
-
-
-
-
-
-
-
-
