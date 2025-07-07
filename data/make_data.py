@@ -5,11 +5,12 @@ import random
 import sys
 
 import numpy as np
-from tokenizer.rwkv_tokenizer import TRIE_TOKENIZER
 
-from src.binidx import MMapIndexedDataset
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from tokenizer.rwkv_tokenizer import TRIE_TOKENIZER  # noqa: E402
+
+from src.binidx import MMapIndexedDataset  # noqa: E402
 
 """
 How to use:
@@ -41,8 +42,10 @@ where the data is repeated 3 times (each time with different shuffle)
 # MMapIndexedDatasetBuilder
 ########################################################################################################
 
-
-tokenizer = TRIE_TOKENIZER("tokenizer/rwkv_vocab_v20230424.txt")
+try:
+    tokenizer = TRIE_TOKENIZER("tokenizer/rwkv_vocab_v20230424.txt")
+except FileNotFoundError:
+    tokenizer = TRIE_TOKENIZER("data/tokenizer/rwkv_vocab_v20230424.txt")
 
 
 def index_file_path(prefix_path):
