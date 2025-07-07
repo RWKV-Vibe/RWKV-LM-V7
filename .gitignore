@@ -6,3 +6,6 @@ data/*
 !data/tokenizer/
 !data/tokenizer/**
 out/*
+*.bin
+*.idx
+*.pyc
