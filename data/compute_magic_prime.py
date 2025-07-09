@@ -3,10 +3,9 @@
 import os
 import sys
 
-from src.binidx import MMapIndexedDataset
-
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from src.binidx import MMapIndexedDataset
 
 def is_prime(n):
     if n <= 1:
