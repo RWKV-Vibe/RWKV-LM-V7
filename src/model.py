@@ -14,6 +14,7 @@ from pytorch_lightning.strategies import DeepSpeedStrategy
 from rwkvfla.modules.token_shift import token_shift
 from rwkvfla.ops.rwkv7.fused_addcmul import fused_addcmul_rwkv7
 from rwkvfla.ops.rwkv7.fused_k_update import fused_k_rwkv7
+from rwkvfla.ops.rwkv7.gate_output_correction import gate_output_correction
 from torch.nn import functional as F
 from torch.utils.cpp_extension import load
 
@@ -253,13 +254,8 @@ class RWKV_Tmix_x070(nn.Module):
         x = RUN_CUDA_RWKV7g(r, w, k, v, -kk, kk * a)
         x = self.ln_x(x.view(B * T, C)).view(B, T, C)
 
-        x = x + (
-            (r.view(B, T, self.n_head, -1) * k.view(B, T, self.n_head, -1) * self.r_k).sum(
-                dim=-1, keepdim=True
-            )
-            * v.view(B, T, self.n_head, -1)
-        ).view(B, T, C)
-        x = self.output(x * g)
+        x = gate_output_correction(x, r.view(B, T, self.n_head, -1), k, self.r_k, v, g)
+        x = self.output(x)
         return x, v_first
 
 
