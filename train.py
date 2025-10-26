@@ -79,8 +79,6 @@ if __name__ == "__main__":
     parser.add_argument("--devices", default="1", type=int)
     parser.add_argument("--enable_progress_bar", default=True, type=bool)
                         
-
-
     args = parser.parse_args()
 
     ########################################################################################################
