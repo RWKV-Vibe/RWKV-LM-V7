@@ -74,9 +74,9 @@ if __name__ == "__main__":
 
     parser.add_argument("--strategy", default="deepspeed_stage_2", type=str)
     parser.add_argument("--precision", default="bf16-mixed", type=str)
-    parser.add_argument("--num_nodes", default="1", type=int)
+    parser.add_argument("--num_nodes", default=1, type=int)
     parser.add_argument("--accelerator", default="cpu", type=str)
-    parser.add_argument("--devices", default="1", type=int)
+    parser.add_argument("--devices", default=1, type=int)
     parser.add_argument("--enable_progress_bar", default=True, type=bool)
                         
     args = parser.parse_args()
@@ -306,6 +306,7 @@ if __name__ == "__main__":
         check_val_every_n_epoch=args.check_val_every_n_epoch,
         log_every_n_steps=args.log_every_n_steps,
         max_epochs=args.max_epochs,
+        enable_progress_bar=args.enable_progress_bar,
         callbacks=[train_callback(args)],
     )
 
