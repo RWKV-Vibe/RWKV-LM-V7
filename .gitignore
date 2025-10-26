@@ -10,3 +10,4 @@ out/*
 *.idx
 *.pyc
 hip/
+.vscode/
