@@ -58,7 +58,7 @@ if "x070" in os.environ["RWKV_MY_TESTING"]:
             "-ffast-math",
             "-O3",
             "-munsafe-fp-atomics",
-            "--save-temps", 
+            "--save-temps",
             '-DAMD'
         ]
         load(

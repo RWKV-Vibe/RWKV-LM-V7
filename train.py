@@ -78,7 +78,7 @@ if __name__ == "__main__":
     parser.add_argument("--accelerator", default="cpu", type=str)
     parser.add_argument("--devices", default=1, type=int)
     parser.add_argument("--enable_progress_bar", default=True, type=bool)
-                        
+
     args = parser.parse_args()
 
     ########################################################################################################
@@ -301,7 +301,7 @@ if __name__ == "__main__":
         precision=args.precision,
         enable_checkpointing=args.enable_checkpointing,
         logger=args.logger,
-        gradient_clip_val=args.gradient_clip_val, 
+        gradient_clip_val=args.gradient_clip_val,
         num_sanity_val_steps=args.num_sanity_val_steps,
         check_val_every_n_epoch=args.check_val_every_n_epoch,
         log_every_n_steps=args.log_every_n_steps,
