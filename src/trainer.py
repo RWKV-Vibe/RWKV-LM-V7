@@ -4,10 +4,19 @@ import time
 
 import pytorch_lightning as pl
 import torch
-from pytorch_lightning.utilities import rank_zero_info, rank_zero_only
+from lightning_utilities.core.rank_zero import rank_zero_info, rank_zero_only
 
 
 def my_save(args, trainer, dd, ff):
+    """
+    Save model or data to disk, using the trainer's DeepSpeed-aware checkpoint method when appropriate.
+    
+    Parameters:
+        args: Configuration object with a `strategy` attribute (iterable or string) used to detect DeepSpeed stage 3.
+        trainer: PyTorch Lightning Trainer used to save checkpoints when DeepSpeed stage 3 is active.
+        dd: The object to save (e.g., state dict or full object) when not using trainer checkpointing.
+        ff (str): Destination file path for the saved checkpoint or object.
+    """
     if "deepspeed_stage_3" in args.strategy:
         trainer.save_checkpoint(ff, weights_only=True)
     else:
@@ -97,6 +106,24 @@ class train_callback(pl.Callback):
                     trainer.my_wandb = wandb
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+        """
+        Update logging, running loss statistics, optional Weights & Biases metrics, and save a final checkpoint at a configured milestone after each training batch.
+        
+        Parameters:
+            trainer: Lightning trainer instance used to read and update global step, timing, and per-run state (e.g., my_time_ns, my_loss_sum, my_loss_count, my_lr, my_wd, my_wandb).
+            pl_module: The LightningModule currently being trained; used to obtain state_dict when saving the final checkpoint.
+            outputs: Model outputs for the batch; may be a dict with a 'loss' tensor or a tensor-like loss value.
+            batch: The current training batch (unused by this callback aside from signature compatibility).
+            batch_idx: Index of the current batch within the epoch (unused by this callback aside from signature compatibility).
+        
+        Behavior:
+            - When running on the primary process (trainer.is_global_zero), updates timing and computes iteration/throughput metrics, updates running loss statistics (trainer.my_loss, trainer.my_loss_sum, trainer.my_loss_count, trainer.my_epoch_loss), logs lr and loss to the progress bar, and, if configured, logs a metrics dict to Weights & Biases including loss, lr, wd, Gtokens, and kt/s when available.
+            - When running on the primary process or when using DeepSpeed stage 3, checks whether the current real step matches the configured magic_prime milestone and, if so, saves the model state_dict to rwkv-final.pth and logs a completion message.
+        
+        Notes:
+            - This callback mutates trainer state fields described above.
+            - No value is returned.
+        """
         args = self.args
         token_per_step = args.ctx_len * args.real_bsz
         real_step = trainer.global_step + args.epoch_begin * args.epoch_steps
@@ -112,8 +139,12 @@ class train_callback(pl.Callback):
             except BaseException:
                 pass
             trainer.my_time_ns = t_now
-            trainer.my_loss = trainer.my_loss_all.float().mean().item()
-            trainer.my_loss_sum += trainer.my_loss
+            if isinstance(outputs, dict):
+                current_loss = outputs['loss'].item()
+            else:
+                current_loss = outputs.item()
+            trainer.my_loss = current_loss
+            trainer.my_loss_sum += current_loss
             trainer.my_loss_count += 1
             trainer.my_epoch_loss = trainer.my_loss_sum / trainer.my_loss_count
             self.log("lr", trainer.my_lr, prog_bar=True, on_step=True)
@@ -148,8 +179,17 @@ class train_callback(pl.Callback):
                     )
 
     def on_train_epoch_start(self, trainer, pl_module):
+        """
+        Prepare the training dataset for the upcoming epoch by setting distributed and epoch metadata.
+        
+        This sets dataset.global_rank, dataset.real_epoch (computed as args.epoch_begin + trainer.current_epoch), and dataset.world_size on the dataset obtained from trainer.train_dataloader. It also asserts that the dataset's representation contains "MyDataset".
+        
+        Parameters:
+        	trainer (pl.Trainer): The trainer providing global_rank, current_epoch, and train_dataloader.
+        	pl_module (pl.LightningModule): The LightningModule for the current training run (unused).
+        """
         args = self.args
-        dataset = trainer.train_dataloader.dataset.datasets
+        dataset = trainer.train_dataloader.dataset
         assert "MyDataset" in str(dataset)
         dataset.global_rank = trainer.global_rank
         dataset.real_epoch = int(args.epoch_begin + trainer.current_epoch)

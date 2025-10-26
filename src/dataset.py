@@ -5,7 +5,7 @@
 import math
 
 import torch
-from pytorch_lightning.utilities import rank_zero_info
+from lightning_utilities.core.rank_zero import rank_zero_info
 from torch.utils.data import Dataset
 
 from .binidx import MMapIndexedDataset
@@ -28,6 +28,28 @@ def is_prime(n):
 
 class MyDataset(Dataset):
     def __init__(self, args):
+        """
+        Initialize the dataset object, load the memory-mapped token dataset, compute dataset sizes and slots, initialize epoch/rank placeholders, and validate configuration invariants.
+        
+        Parameters:
+            args: Configuration object containing required fields:
+                - vocab_size: vocabulary size to store in self.vocab_size.
+                - data_file: path used to create the MMapIndexedDataset.
+                - ctx_len: context length used to compute dataset slots.
+                - epoch_steps, real_bsz: used to compute samples_per_epoch (must equal 40320).
+                - train_stage: (used for informational reporting).
+                - magic_prime: integer that must be prime, satisfy magic_prime % 3 == 2, and have magic_prime / dataset_slot in (0.9, 1].
+        
+        Behavior:
+            Sets the following attributes on self:
+              - args, vocab_size, data (MMapIndexedDataset), data_size (number of tokens),
+                samples_per_epoch, global_rank (0), real_epoch (0), world_size (1).
+            Enforces these assertions:
+              - samples_per_epoch == 40320
+              - is_prime(magic_prime) is True
+              - magic_prime % 3 == 2
+              - 0.9 < magic_prime / dataset_slot <= 1
+        """
         self.args = args
 
         self.vocab_size = args.vocab_size
@@ -43,6 +65,10 @@ class MyDataset(Dataset):
         assert self.samples_per_epoch == 40320
         rank_zero_info(f"########## train stage {args.train_stage} ##########")
         dataset_slot = self.data_size // args.ctx_len
+        # add default rank parameter
+        self.global_rank = 0
+        self.real_epoch = 0
+        self.world_size = 1
 
         assert is_prime(args.magic_prime)
         assert args.magic_prime % 3 == 2
