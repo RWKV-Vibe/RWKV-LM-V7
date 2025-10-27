@@ -35,6 +35,8 @@ ROCm_flag = torch.version.hip is not None
 CompileFunction = __nop
 if os.environ["RWKV_COMPILE_ON"] == "1":
     CompileFunction = torch.compile
+    import torch._dynamo.config
+    torch._dynamo.config.allow_unspec_int_on_nn_module = True
 
 
 #################################################################
@@ -56,9 +58,11 @@ if "x070" in os.environ["RWKV_MY_TESTING"]:
             "-ffast-math",
             "-O3",
             "-munsafe-fp-atomics",
+            "--save-temps",
+            '-DAMD'
         ]
         load(
-            name="wind_backstepping_hip",
+            name="wind_backstepping",
             sources=["cuda/wkv7_hip.hip", "cuda/wkv7_op.hip"],
             is_python_module=False,
             verbose=True,

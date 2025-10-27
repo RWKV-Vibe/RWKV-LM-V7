@@ -72,7 +72,13 @@ if __name__ == "__main__":
     parser.add_argument("--my_exit_tokens", default=0, type=int)
     parser.add_argument("--compile", default=1, type=int)
 
-    parser = Trainer.add_argparse_args(parser)
+    parser.add_argument("--strategy", default="deepspeed_stage_2", type=str)
+    parser.add_argument("--precision", default="bf16-mixed", type=str)
+    parser.add_argument("--num_nodes", default=1, type=int)
+    parser.add_argument("--accelerator", default="cpu", type=str)
+    parser.add_argument("--devices", default=1, type=int)
+    parser.add_argument("--enable_progress_bar", default=True, type=bool)
+
     args = parser.parse_args()
 
     ########################################################################################################
@@ -202,7 +208,7 @@ if __name__ == "__main__":
             "\n\nNote: lr_final = 0 or lr_init = 0. Using linear LR schedule instead.\n\n"
         )
 
-    assert args.precision in ["fp32", "tf32", "fp16", "bf16"]
+    assert args.precision in ["fp32", "tf32", "fp16", "bf16-mixed"]
     os.environ["RWKV_FLOAT_MODE"] = args.precision
     if args.precision == "fp32":
         for i in range(10):
@@ -287,8 +293,20 @@ if __name__ == "__main__":
                 load_dict[k] = model.state_dict()[k]
     model.load_state_dict(load_dict)
 
-    trainer = Trainer.from_argparse_args(
-        args,
+    trainer = Trainer(
+        accelerator=args.accelerator,
+        strategy=args.strategy,
+        devices=args.devices,
+        num_nodes=args.num_nodes,
+        precision=args.precision,
+        enable_checkpointing=args.enable_checkpointing,
+        logger=args.logger,
+        gradient_clip_val=args.gradient_clip_val,
+        num_sanity_val_steps=args.num_sanity_val_steps,
+        check_val_every_n_epoch=args.check_val_every_n_epoch,
+        log_every_n_steps=args.log_every_n_steps,
+        max_epochs=args.max_epochs,
+        enable_progress_bar=args.enable_progress_bar,
         callbacks=[train_callback(args)],
     )
 

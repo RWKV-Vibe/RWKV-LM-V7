@@ -9,3 +9,5 @@ out/*
 *.bin
 *.idx
 *.pyc
+hip/
+.vscode/
