@@ -73,7 +73,7 @@ if __name__ == "__main__":
     parser.add_argument("--compile", default=1, type=int)
 
     parser.add_argument("--strategy", default="deepspeed_stage_2", type=str)
-    parser.add_argument("--precision", default="bf16-mixed", type=str)
+    parser.add_argument("--precision", default="bf16", type=str)
     parser.add_argument("--num_nodes", default=1, type=int)
     parser.add_argument("--accelerator", default="cpu", type=str)
     parser.add_argument("--devices", default=1, type=int)
@@ -208,7 +208,7 @@ if __name__ == "__main__":
             "\n\nNote: lr_final = 0 or lr_init = 0. Using linear LR schedule instead.\n\n"
         )
 
-    assert args.precision in ["fp32", "tf32", "fp16", "bf16-mixed"]
+    assert args.precision in ["fp32", "tf32", "fp16", "bf16"]
     os.environ["RWKV_FLOAT_MODE"] = args.precision
     if args.precision == "fp32":
         for i in range(10):
