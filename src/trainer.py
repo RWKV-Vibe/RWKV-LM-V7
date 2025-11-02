@@ -153,7 +153,7 @@ class train_callback(pl.Callback):
 
     def on_train_epoch_start(self, trainer, pl_module):
         args = self.args
-        dataset = trainer.train_dataloader.dataset
+        dataset = trainer.train_dataloader.dataset.datasets
         assert "MyDataset" in str(dataset)
         dataset.global_rank = trainer.global_rank
         dataset.real_epoch = int(args.epoch_begin + trainer.current_epoch)
