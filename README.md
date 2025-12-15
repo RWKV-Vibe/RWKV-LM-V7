@@ -66,6 +66,15 @@ This section contains explanations of model initialization, learning rates, and 
 
 RWKV-7 uses initializations that are both theoretically designed with mathematical proof and empirically derived from training results to accelerate model convergence and improve performance.
 
+### RWKV G1 model Lora Dim
+
+|             | params | 0.1B | 0.4B | 1.5B | 2.9B | 7.2B | 13.3B |  
+|-------------|--------|------|------|------|------|------|-------| 
+|D_DECAY_LORA |   w    |  64  |  64  |  96  |  96  |  128 |  192  |
+|D_AAA_LORA   |   a    |  64  |  64  |  96  |  96  |  128 |  192  |
+|D_MV_LORA    |   v    |  32  |  32  |  64  |  64  |  96  |  128  |   
+|D_GATE_LORA  |   g    |  128 |  128 |  256 |  320 |  480 |  384  |
+
 ### L2Warp
 
 This type of penalty prevents the model from becoming overconfident, thereby mitigating precision loss in BF16.
