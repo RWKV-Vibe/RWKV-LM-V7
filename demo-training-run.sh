@@ -74,7 +74,7 @@ python train.py \
  --n_embd $N_EMBD \
  --n_layer $N_LAYER \
  --num_nodes $N_NODE \
- --precision bf16-mixed \
+ --precision bf16 \
  --proj_dir $PROJ_DIR \
  --strategy deepspeed_stage_2 \
  --train_stage 3 \

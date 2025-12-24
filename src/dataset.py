@@ -40,7 +40,7 @@ class MyDataset(Dataset):
         rank_zero_info(f"Data has {self.data_size} tokens.")
 
         self.samples_per_epoch = args.epoch_steps * args.real_bsz
-        assert self.samples_per_epoch == 40320
+        assert self.samples_per_epoch == 40320 * args.devices
         rank_zero_info(f"########## train stage {args.train_stage} ##########")
         dataset_slot = self.data_size // args.ctx_len
         # add default rank parameter

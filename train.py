@@ -137,9 +137,11 @@ if __name__ == "__main__":
     if not os.path.exists(args.proj_dir):
         os.makedirs(args.proj_dir)
 
+    # fucking pytorch_lightning 2.6 epoch_steps !!! #
     args.epoch_count = args.magic_prime // 40320
-    args.epoch_steps = 40320 // args.real_bsz
-    assert args.epoch_steps * args.real_bsz == 40320
+    args.epoch_steps = 40320 // args.real_bsz * args.devices 
+    assert args.epoch_steps * args.real_bsz  == 40320 * args.devices 
+    # fucking pytorch_lightning 2.6 epoch_steps !!! #
 
     if args.train_stage >= 2:  # find latest saved model
         list_p = []
@@ -164,7 +166,8 @@ if __name__ == "__main__":
                 args.warmup_steps = 10
         args.epoch_begin = max_p + 1
 
-    samples_per_epoch = args.epoch_steps * args.real_bsz
+    epoch_steps = args.epoch_steps // args.devices
+    samples_per_epoch = epoch_steps * args.real_bsz
     tokens_per_epoch = samples_per_epoch * args.ctx_len
     try:
         deepspeed_version = deepspeed.__version__
@@ -184,7 +187,7 @@ if __name__ == "__main__":
             f"# Epoch = {args.epoch_begin} to {args.epoch_begin + args.epoch_count - 1} "
             f"(will continue afterwards), save every {args.epoch_save} epoch\n"
             f"#\n"
-            f'# Each "epoch" = {args.epoch_steps} steps, {samples_per_epoch} samples, {tokens_per_epoch} tokens\n'
+            f'# Each "epoch" = {epoch_steps} steps, {samples_per_epoch} samples, {tokens_per_epoch} tokens\n'
             f"#\n"
             f"# Model = {args.n_layer} n_layer, {args.n_embd} n_embd, {args.ctx_len} ctx_len\n"
             f"#\n"
@@ -208,7 +211,7 @@ if __name__ == "__main__":
             "\n\nNote: lr_final = 0 or lr_init = 0. Using linear LR schedule instead.\n\n"
         )
 
-    assert args.precision in ["fp32", "tf32", "fp16", "bf16-mixed"]
+    assert args.precision in ["fp32", "tf32", "fp16", "bf16"]
     os.environ["RWKV_FLOAT_MODE"] = args.precision
     if args.precision == "fp32":
         for i in range(10):
@@ -308,6 +311,7 @@ if __name__ == "__main__":
         max_epochs=args.max_epochs,
         enable_progress_bar=args.enable_progress_bar,
         callbacks=[train_callback(args)],
+        limit_train_batches=args.epoch_steps,
     )
 
     if trainer.global_rank == 0:
