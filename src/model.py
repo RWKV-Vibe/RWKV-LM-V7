@@ -357,18 +357,21 @@ class FusedLinearCrossEntropyWithL2Warp(torch.autograd.Function):
     2. Backward: Recomputes Logits in chunks, decoupling VRAM usage from sequence length.
     3. Integration: Built-in support for RWKV-specific L2Warp regularization.
     """
+    # Chunk size 512 strikes a balance between CUDA kernel overhead and VRAM savings
+    CHUNK_SIZE = 512
+
     @staticmethod
-    def forward(ctx, hidden_states, weight, target, l2warp_factor=1e-4):
+    def forward(ctx, hidden_states, weight, target, l2warp_factor=1e-4, chunk_size=None):
         # hidden_states: [B_T, H], weight: [V, H], target: [B_T]
-        B_T, H = hidden_states.shape
-        V = weight.shape[0]
+        B_T, _ = hidden_states.shape
         
         ctx.save_for_backward(hidden_states, weight, target)
         ctx.l2warp_factor = l2warp_factor
         ctx.B_T = B_T
         
-        # Chunk size 512 strikes a balance between CUDA kernel overhead and VRAM savings
-        chunk_size = 512
+        chunk_size = chunk_size or FusedLinearCrossEntropyWithL2Warp.CHUNK_SIZE
+        ctx.chunk_size = chunk_size
+
         loss_sum = torch.zeros([], device=hidden_states.device, dtype=torch.float32)
         
         for start in range(0, B_T, chunk_size):
@@ -393,7 +396,8 @@ class FusedLinearCrossEntropyWithL2Warp(torch.autograd.Function):
         B_T = ctx.B_T
         V = weight.shape[0]
         
-        chunk_size = 512
+        chunk_size = ctx.chunk_size
+
         grad_hidden = torch.empty_like(hidden_states)
         grad_weight = torch.zeros_like(weight)
         
@@ -408,10 +412,8 @@ class FusedLinearCrossEntropyWithL2Warp(torch.autograd.Function):
             
             grad_logits_chunk = softmax_chunk.clone()
             # Efficient in-place scatter for target subtraction
-            grad_logits_chunk.scatter_(
-                -1, target_chunk.unsqueeze(-1), 
-                grad_logits_chunk.gather(-1, target_chunk.unsqueeze(-1)) - 1.0
-            )
+            rows = torch.arange(grad_logits_chunk.size(0), device=grad_logits_chunk.device)
+            grad_logits_chunk[rows, target_chunk] -= 1.0
             grad_logits_chunk /= B_T
             
             factor = l2warp_factor / (B_T * V)
@@ -427,7 +429,8 @@ class FusedLinearCrossEntropyWithL2Warp(torch.autograd.Function):
             grad_hidden[start:end] = torch.matmul(total_grad_logits_chunk, weight)
             grad_weight += torch.matmul(total_grad_logits_chunk.t(), hs_chunk)
 
-        return grad_hidden, grad_weight, None, None
+        return grad_hidden, grad_weight, None, None, None
+
 
 class RWKV(pl.LightningModule):
     def __init__(self, args):
@@ -585,23 +588,23 @@ class RWKV(pl.LightningModule):
         return x
 
     def training_step(self, batch, batch_idx):
-        args = self.args
         idx, targets = batch
         
-        if args.fuse_l2warp:
+        if hasattr(self.args, 'fuse_l2warp') and self.args.fuse_l2warp:
             # Use fused linear cross entropy with L2Warp
             # This avoids materializing the full logits tensor
             hidden = self(idx, return_logits=False)  # [B, T, n_embd]
-            B, T, H = hidden.shape
-            hidden = hidden.view(-1, H)  # [B*T, n_embd]
+            hidden = hidden.view(-1, hidden.shape[-1])  # 直接使用 shape[-1] 替代解包
             targets = targets.view(-1)  # [B*T]
-            
+
+            dynamic_l2warp = getattr(self.args, 'l2warp_factor', 1e-4)
+
             # Use the head weight directly to avoid storing logits
             loss = FusedLinearCrossEntropyWithL2Warp.apply(
                 hidden, 
                 self.head.weight, 
                 targets,
-                1e-4  # L2 warp factor
+                dynamic_l2warp  # L2 warp factor
             )
             return loss
         else:
