@@ -81,3 +81,5 @@ python train.py \
  --vocab_size 65536 \
  --warmup_steps 10 \
  --weight_decay 0.001 \
+ --fuse_l2warp 1
+ 

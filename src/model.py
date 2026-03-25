@@ -26,7 +26,6 @@ try:
 except BaseException:
     os.environ["RWKV_MY_TESTING"] = ""
 
-
 def __nop(ob):
     return ob
 
@@ -349,6 +348,90 @@ class L2Wrap(torch.autograd.Function):
         return (grad_output, gy)
 
 
+class FusedLinearCrossEntropyWithL2Warp(torch.autograd.Function):
+    """
+    VRAM-optimized Fused Head operator.
+    
+    Key Features:
+    1. Forward: Calculates CrossEntropy in chunks to avoid storing full Logits [B*T, V].
+    2. Backward: Recomputes Logits in chunks, decoupling VRAM usage from sequence length.
+    3. Integration: Built-in support for RWKV-specific L2Warp regularization.
+    """
+    # Chunk size 512 strikes a balance between CUDA kernel overhead and VRAM savings
+    CHUNK_SIZE = 512
+
+    @staticmethod
+    def forward(ctx, hidden_states, weight, target, l2warp_factor=1e-4, chunk_size=None):
+        # hidden_states: [B_T, H], weight: [V, H], target: [B_T]
+        B_T, _ = hidden_states.shape
+        
+        ctx.save_for_backward(hidden_states, weight, target)
+        ctx.l2warp_factor = l2warp_factor
+        ctx.B_T = B_T
+        
+        chunk_size = chunk_size or FusedLinearCrossEntropyWithL2Warp.CHUNK_SIZE
+        ctx.chunk_size = chunk_size
+
+        loss_sum = torch.zeros([], device=hidden_states.device, dtype=torch.float32)
+        
+        for start in range(0, B_T, chunk_size):
+            end = min(start + chunk_size, B_T)
+            hs_chunk = hidden_states[start:end]
+            target_chunk = target[start:end]
+            
+            # Compute logits in FP32 for numerical stability: [chunk, H] @ [H, V] -> [chunk, V]
+            logits_chunk = torch.matmul(hs_chunk, weight.t()).float()
+            
+            # Calculate CrossEntropy sum for this chunk
+            loss_chunk = F.cross_entropy(logits_chunk, target_chunk, reduction='sum')
+            loss_sum += loss_chunk
+        
+        # Return Mean Loss
+        return loss_sum / B_T
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        hidden_states, weight, target = ctx.saved_tensors
+        l2warp_factor = ctx.l2warp_factor
+        B_T = ctx.B_T
+        V = weight.shape[0]
+        
+        chunk_size = ctx.chunk_size
+
+        grad_hidden = torch.empty_like(hidden_states)
+        grad_weight = torch.zeros_like(weight)
+        
+        for start in range(0, B_T, chunk_size):
+            end = min(start + chunk_size, B_T)
+            hs_chunk = hidden_states[start:end]
+            target_chunk = target[start:end]
+            
+            logits_chunk = torch.matmul(hs_chunk, weight.t()).float()
+            
+            softmax_chunk = logits_chunk.softmax(dim=-1)
+            
+            grad_logits_chunk = softmax_chunk.clone()
+            # Efficient in-place scatter for target subtraction
+            rows = torch.arange(grad_logits_chunk.size(0), device=grad_logits_chunk.device)
+            grad_logits_chunk[rows, target_chunk] -= 1.0
+            grad_logits_chunk /= B_T
+            
+            factor = l2warp_factor / (B_T * V)
+            maxx_chunk, ids_chunk = torch.max(logits_chunk, -1, keepdim=True)
+            
+            l2warp_grad_chunk = torch.zeros_like(logits_chunk)
+            l2warp_grad_chunk.scatter_(-1, ids_chunk, maxx_chunk * factor)
+            
+            total_grad_logits_chunk = (grad_logits_chunk + l2warp_grad_chunk) * grad_output
+            
+            total_grad_logits_chunk = total_grad_logits_chunk.to(hs_chunk.dtype)
+            
+            grad_hidden[start:end] = torch.matmul(total_grad_logits_chunk, weight)
+            grad_weight += torch.matmul(total_grad_logits_chunk.t(), hs_chunk)
+
+        return grad_hidden, grad_weight, None, None, None
+
+
 class RWKV(pl.LightningModule):
     def __init__(self, args):
         super().__init__()
@@ -363,6 +446,11 @@ class RWKV(pl.LightningModule):
         assert args.n_embd % 32 == 0
         assert args.dim_att % 32 == 0
         assert args.dim_ffn % 32 == 0
+        
+        # Check if we should use fused L2Warp to reduce VRAM
+        # Default to False if not specified
+        if not hasattr(args, "fuse_l2warp"):
+            args.fuse_l2warp = 0
 
         self.emb = nn.Embedding(args.vocab_size, args.n_embd)
 
@@ -473,7 +561,7 @@ class RWKV(pl.LightningModule):
         return False
 
     @CompileFunction
-    def forward(self, idx):
+    def forward(self, idx, return_logits=True):
         args = self.args
         B, T = idx.size()
         assert T <= args.ctx_len, "Cannot forward, model ctx_len is exhausted."
@@ -489,15 +577,42 @@ class RWKV(pl.LightningModule):
                 x, v_first = block(x, v_first)
 
         x = self.ln_out(x)
+        
+        # When fuse_l2warp is True and return_logits is False,
+        # we return hidden states instead of logits to save VRAM
+        # The loss computation will be done in training_step with fused loss
+        if args.fuse_l2warp and not return_logits:
+            return x  # Return hidden states [B, T, n_embd]
+        
         x = self.head(x)
         return x
 
     def training_step(self, batch, batch_idx):
         idx, targets = batch
-        logits = self(idx)
-        loss = F.cross_entropy(
-            logits.view(-1, logits.size(-1)), targets.view(-1))
-        return L2Wrap.apply(loss, logits)
+        
+        if hasattr(self.args, 'fuse_l2warp') and self.args.fuse_l2warp:
+            # Use fused linear cross entropy with L2Warp
+            # This avoids materializing the full logits tensor
+            hidden = self(idx, return_logits=False)  # [B, T, n_embd]
+            hidden = hidden.view(-1, hidden.shape[-1])  # 直接使用 shape[-1] 替代解包
+            targets = targets.view(-1)  # [B*T]
+
+            dynamic_l2warp = getattr(self.args, 'l2warp_factor', 1e-4)
+
+            # Use the head weight directly to avoid storing logits
+            loss = FusedLinearCrossEntropyWithL2Warp.apply(
+                hidden, 
+                self.head.weight, 
+                targets,
+                dynamic_l2warp  # L2 warp factor
+            )
+            return loss
+        else:
+            # Original implementation: compute logits, then CE, then L2Wrap
+            logits = self(idx)
+            loss = F.cross_entropy(
+                logits.view(-1, logits.size(-1)), targets.view(-1))
+            return L2Wrap.apply(loss, logits)
 
     def training_step_end(self, batch_parts):
         all = self.all_gather(batch_parts)

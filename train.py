@@ -71,6 +71,7 @@ if __name__ == "__main__":
     parser.add_argument("--my_testing", default="x070", type=str)
     parser.add_argument("--my_exit_tokens", default=0, type=int)
     parser.add_argument("--compile", default=1, type=int)
+    parser.add_argument("--fuse_l2warp", default=0, type=int)
 
     parser.add_argument("--strategy", default="deepspeed_stage_2", type=str)
     parser.add_argument("--precision", default="bf16-mixed", type=str)
