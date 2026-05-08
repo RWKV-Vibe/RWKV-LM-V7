@@ -47,7 +47,7 @@ if ROCm_flag is True:
     ]
     load(
         name="wind_backstepping",
-        sources=["cuda/wkv7_hip_fp32.hip", "cuda/wkv7_op_fp32.hip"],
+        sources=["hip/wkv7_hip_fp32.hip", "hip/wkv7_op_fp32.hip"],
         is_python_module=False,
         verbose=True,
         extra_cuda_cflags=flags,
