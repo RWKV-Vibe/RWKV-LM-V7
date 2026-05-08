@@ -12,7 +12,7 @@ This project allows any researcher to start pre-training a fully aligned RWKV v7
 
 All code is sourced from the original RWKV-LM project: https://github.com/BlinkDL/RWKV-LM
 
-This repository is suitable for quickly reproducing small-scale RWKV v7 series models (e.g., 191M to 3B) on NVIDIA GPUs using either sample data or private data. We will focus on the following improvements next:
+This repository is suitable for quickly reproducing small-scale RWKV v7 series models (e.g., 191M to 3B) on NVIDIA & AMD GPUs using either sample data or private data. We will focus on the following improvements next:
 
 -   Provide template code for RWKV series models for tasks such as multimodal applications.
 -   Provide cross-platform kernel implementations.
@@ -29,22 +29,22 @@ We love and give back to the open-source community and appreciate any implementa
 
 ### Prepare Environment
 
-To prepare the environment, please use a conda-compatible package manager like miniforge to create a new environment.
+To prepare the environment, please use UV that is very fast and easy to use.
 ```
-conda create -n rwkv-lm-v7 python=3.12
-conda activate rwkv-lm-v7
+uv venv ./rwkv-lm --python 3.12
+source ./rwkv-lm/bin/activate
 ```
 Next, install the following dependencies. Please note that `pytorch-lightning` is fixed at version `1.9.5`. This is a specific requirement for this repository; do not upgrade this package.
 ```
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
-pip3 install -r requirements.txt
+uv pip install torch
+uv pip install -r requirements.txt
 ```
 
 ### Download Data
 
 ```
-wget --continue -O data/minipile.idx https://huggingface.co/datasets/BlinkDL/minipile-tokenized/resolve/main/rwkv_vocab_v20230424/minipile.idx
-wget --continue -O data/minipile.bin https://huggingface.co/datasets/BlinkDL/minipile-tokenized/resolve/main/rwkv_vocab_v20230424/minipile.bin
+wget -O data/minipile.idx https://huggingface.co/datasets/BlinkDL/minipile-tokenized/resolve/main/rwkv_vocab_v20230424/minipile.idx
+wget -O data/minipile.bin https://huggingface.co/datasets/BlinkDL/minipile-tokenized/resolve/main/rwkv_vocab_v20230424/minipile.bin
 ```
 ### Start Training
 

@@ -1,15 +1,13 @@
-#################################################################
+########################################################################################################
 # The RWKV Language Model - https://github.com/BlinkDL/RWKV-LM
-#################################################################
+########################################################################################################
 
-import math
-
+import json, math, random, os, sys
+import numpy as np
 import torch
-from lightning_utilities.core.rank_zero import rank_zero_info
 from torch.utils.data import Dataset
-
+from pytorch_lightning.utilities import rank_zero_info
 from .binidx import MMapIndexedDataset
-
 
 def is_prime(n):
     if n <= 1:
@@ -25,28 +23,21 @@ def is_prime(n):
         i += 6
     return True
 
-
 class MyDataset(Dataset):
     def __init__(self, args):
         self.args = args
 
         self.vocab_size = args.vocab_size
-        rank_zero_info(
-            f"Current vocab size = {self.vocab_size} (make sure it's correct)")
+        rank_zero_info(f"Current vocab size = {self.vocab_size} (make sure it's correct)")
 
         self.data = MMapIndexedDataset(args.data_file)
-        self.data_size = len(
-            self.data._bin_buffer) // self.data._index._dtype_size
+        self.data_size = len(self.data._bin_buffer) // self.data._index._dtype_size
         rank_zero_info(f"Data has {self.data_size} tokens.")
 
         self.samples_per_epoch = args.epoch_steps * args.real_bsz
-        assert self.samples_per_epoch == 40320 * args.devices
+        assert self.samples_per_epoch == 40320
         rank_zero_info(f"########## train stage {args.train_stage} ##########")
         dataset_slot = self.data_size // args.ctx_len
-        # add default rank parameter
-        self.global_rank = 0
-        self.real_epoch = 0
-        self.world_size = 1
 
         assert is_prime(args.magic_prime)
         assert args.magic_prime % 3 == 2

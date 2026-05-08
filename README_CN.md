@@ -12,7 +12,7 @@
 
 所有的代码来源于原始 RWKV-LM 项目：https://github.com/BlinkDL/RWKV-LM
 
-此仓库适合快速的在英伟达显卡上使用样例数据或私有数据小规模的复现 RWKV v7 系列模型，例如 191M ~ 3B 等大小，我们接下来会重点改善：
+此仓库适合快速的在Nvidia和AMD显卡上使用样例数据或私有数据小规模的复现 RWKV v7 系列模型，例如 191M ~ 3B 等大小，我们接下来会重点改善：
 
 - 提供 RWKV 系列模型在多模态等任务的模板代码
 - 提供跨平台的内核实现
@@ -29,22 +29,23 @@
 
 ### 准备环境
 
-环境准备，请使用 miniforge 等 conda 兼容包管理器，创建一个全新的环境：
+环境准备，请使用 UV 嘎嘎快而且非常方便，用过的都说好 😉
 ```
-conda create -n rwkv-lm-v7 python=3.12
-conda activate rwkv-lm-v7
+uv venv ./rwkv-lm --python 3.12
+source ./rwkv-lm/bin/activate
 ```
 随后安装下列依赖，注意 `pytorch-lightning` 固定使用了 `1.9.5` 版本，此为本仓库特性，请不要升级此依赖包。
 ```
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
-pip3 install -r requirements.txt
+uv pip install torch
+uv pip install -r requirements.txt
 ```
 
 ### 下载数据
 
 ```
-wget --continue -O data/minipile.idx https://huggingface.co/datasets/BlinkDL/minipile-tokenized/resolve/main/rwkv_vocab_v20230424/minipile.idx
-wget --continue -O data/minipile.bin https://huggingface.co/datasets/BlinkDL/minipile-tokenized/resolve/main/rwkv_vocab_v20230424/minipile.bin
+wget -O data/minipile.idx https://huggingface.co/datasets/BlinkDL/minipile-tokenized/resolve/main/rwkv_vocab_v20230424/minipile.idx
+wget -O data/minipile.bin https://huggingface.co/datasets/BlinkDL/minipile-tokenized/resolve/main/rwkv_vocab_v20230424/minipile.bin
+```
 ```
 
 ### 开始训练

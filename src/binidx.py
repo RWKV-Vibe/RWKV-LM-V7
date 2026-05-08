@@ -1,11 +1,9 @@
 import os
+import torch
+import numpy as np
 import struct
 from functools import lru_cache
 from itertools import accumulate
-
-import numpy as np
-import torch
-
 
 def print_rank_0(*message):
     pass
@@ -16,13 +14,11 @@ def print_rank_0(*message):
     # else:
     #     print(*message, flush=True)
 
-
 def _warmup_mmap_file(path):
     pass
     # with open(path, "rb") as stream:
     #     while stream.read(100 * 1024 * 1024):
     #         pass
-
 
 dtypes = {
     1: np.uint8,
@@ -35,21 +31,17 @@ dtypes = {
     8: np.uint16,
 }
 
-
 def code(dtype):
     for k in dtypes.keys():
         if dtypes[k] == dtype:
             return k
     raise ValueError(dtype)
 
-
 def index_file_path(prefix_path):
     return prefix_path + ".idx"
 
-
 def data_file_path(prefix_path):
     return prefix_path + ".bin"
-
 
 class MMapIndexedDataset(torch.utils.data.Dataset):
     class Index(object):
@@ -106,8 +98,8 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
                     self._file.close()
 
             return _Writer()
-
-        def __init__(self, path, skip_warmup=False):
+        
+        def __init__(self, path, skip_warmup=True):
             with open(path, "rb") as stream:
                 magic_test = stream.read(9)
                 assert self._HDR_MAGIC == magic_test, (
@@ -175,7 +167,7 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
         def __len__(self):
             return self._len
 
-    def __init__(self, path, skip_warmup=False):
+    def __init__(self, path, skip_warmup=True):
         super().__init__()
 
         self._path = None
@@ -187,10 +179,10 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
     def __getstate__(self):
         return self._path
 
-    def __setstate__(self, state, skip_warmup=False):
-        self._do_init(state, skip_warmup)
+    def __setstate__(self, state):
+        self._do_init(state)
 
-    def _do_init(self, path, skip_warmup):
+    def _do_init(self, path, skip_warmup=True):
         self._path = path
         self._index = self.Index(index_file_path(self._path), skip_warmup)
 
